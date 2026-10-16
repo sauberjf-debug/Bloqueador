@@ -29,6 +29,16 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         buildUi()
+
+        // Configuração automática: a cada abertura nova do app, pede o que ainda falta,
+        // na ordem certa (contatos primeiro, depois o papel de triagem de chamadas).
+        if (savedInstanceState == null) {
+            if (!hasContactsPermission()) {
+                requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQ_CONTACTS)
+            } else if (!hasScreeningRole()) {
+                requestScreeningRole()
+            }
+        }
     }
 
     override fun onResume() {
@@ -146,6 +156,10 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         refresh()
+        // Contatos liberados: segue direto para a janela de filtro de chamadas.
+        if (requestCode == REQ_CONTACTS && hasContactsPermission() && !hasScreeningRole()) {
+            requestScreeningRole()
+        }
     }
 
     @Deprecated("Deprecated in Java")
