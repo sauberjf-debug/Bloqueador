@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # Só existem depois que você cadastrar os "Secrets" no GitHub (ver LOJA/PASSO_A_PASSO.md).
+  KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,22 +26,36 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.5"
+          gradle-version: "8.14.3"
 
-      - name: Compilar APK
+      - name: Compilar APK de teste
         run: gradle assembleDebug
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bloqueador-ligacoes-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+      # Com a chave cadastrada: gera APK e pacote .aab assinados com a MESMA chave sempre.
+      - name: Gerar APK e pacote (.aab) assinados
+        if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.p12"
+          KEYSTORE_PATH="$RUNNER_TEMP/upload.p12" gradle assembleRelease bundleRelease
 
-      # Publica o .apk na aba "Releases" para baixar direto pelo celular
+      - name: Guardar pacote da Play Store
+        if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: bloqueador-play-store-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+
+      # Publica o .apk na aba "Releases" para baixar direto pelo celular.
+      # Usa o APK assinado com a chave fixa quando existir (assim as atualizações instalam por cima).
       - name: Publicar APK em Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk bloqueador-ligacoes.apk
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk bloqueador-ligacoes.apk
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk bloqueador-ligacoes.apk
+          fi
           gh release delete apk-latest --yes --cleanup-tag || true
           gh release create apk-latest bloqueador-ligacoes.apk \
             --title "APK mais recente" \
