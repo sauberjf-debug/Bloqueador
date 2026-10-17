@@ -40,14 +40,27 @@ class MainActivity : Activity() {
 
     private val dp: Float get() = resources.displayMetrics.density
 
+    private var mainUiBuilt = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
+
+        // Versão de teste: sem a senha de administrador, só aparece a tela de senha.
+        if (AdminGate.required && !prefs.unlocked) {
+            buildLockUi()
+            return
+        }
+        startMain(autoSetup = savedInstanceState == null)
+    }
+
+    private fun startMain(autoSetup: Boolean) {
         buildUi()
+        mainUiBuilt = true
 
         // Configuração automática: a cada abertura nova do app, pede o que ainda falta,
         // na ordem certa (contatos primeiro, depois o papel de triagem de chamadas).
-        if (savedInstanceState == null) {
+        if (autoSetup) {
             if (!hasContactsPermission()) {
                 requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQ_CONTACTS)
             } else if (!hasScreeningRole()) {
@@ -58,7 +71,89 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        refresh()
+        if (mainUiBuilt) refresh()
+    }
+
+    /** Tela de senha de administrador (só existe nas versões de teste). */
+    private fun buildLockUi() {
+        val pad = (24 * dp).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad * 2, pad, pad)
+        }
+        root.addView(TextView(this).apply {
+            text = "Bloqueador de Ligações"
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        root.addView(TextView(this).apply {
+            text = "Versão de teste restrita. Digite a senha de administrador para liberar este aparelho."
+            textSize = 15f
+            setPadding(0, pad / 2, 0, pad / 2)
+        })
+        val input = EditText(this).apply {
+            hint = "Senha de administrador"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+        }
+        root.addView(input)
+        val message = TextView(this).apply {
+            textSize = 14f
+            setTextColor(0xFFB91C1C.toInt())
+            setPadding(0, pad / 3, 0, pad / 3)
+        }
+        root.addView(message)
+
+        val unlock = Button(this).apply { text = "Liberar" }
+        unlock.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (prefs.lockUntil > now) {
+                message.text = "Muitas tentativas. Aguarde ${(prefs.lockUntil - now) / 1000 + 1} s."
+                return@setOnClickListener
+            }
+            if (AdminGate.verify(input.text.toString())) {
+                prefs.unlocked = true
+                prefs.failCount = 0
+                prefs.lockUntil = 0L
+                startMain(autoSetup = true)
+            } else {
+                val fails = prefs.failCount + 1
+                prefs.failCount = fails
+                input.setText("")
+                if (fails >= MAX_TRIES) {
+                    val wait = minOf(3_600_000L, 30_000L shl minOf(fails - MAX_TRIES, 7))
+                    prefs.lockUntil = now + wait
+                    message.text = "Senha incorreta. Aguarde ${wait / 1000} s para tentar de novo."
+                } else {
+                    message.text = "Senha incorreta. Tentativas restantes: ${MAX_TRIES - fails}."
+                }
+            }
+        }
+        root.addView(unlock)
+
+        val scroll = ScrollView(this).apply { addView(root) }
+        applyInsets(scroll)
+        setContentView(scroll)
+    }
+
+    /** Android 15+ desenha o app sob as barras do sistema: empurra o conteúdo para dentro. */
+    private fun applyInsets(view: View) {
+        view.setOnApplyWindowInsetsListener { v, insets ->
+            val top: Int
+            val bottom: Int
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+                top = bars.top
+                bottom = bars.bottom
+            } else {
+                @Suppress("DEPRECATION")
+                top = insets.systemWindowInsetTop
+                @Suppress("DEPRECATION")
+                bottom = insets.systemWindowInsetBottom
+            }
+            v.setPadding(0, top, 0, bottom)
+            insets
+        }
     }
 
     private fun buildUi() {
@@ -194,26 +289,8 @@ class MainActivity : Activity() {
         }
         root.addView(logText)
 
-        val scroll = ScrollView(this).apply {
-            addView(root)
-            // Android 15+ desenha o app sob as barras do sistema: empurra o conteúdo para dentro.
-            setOnApplyWindowInsetsListener { v, insets ->
-                val top: Int
-                val bottom: Int
-                if (Build.VERSION.SDK_INT >= 30) {
-                    val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
-                    top = bars.top
-                    bottom = bars.bottom
-                } else {
-                    @Suppress("DEPRECATION")
-                    top = insets.systemWindowInsetTop
-                    @Suppress("DEPRECATION")
-                    bottom = insets.systemWindowInsetBottom
-                }
-                v.setPadding(0, top, 0, bottom)
-                insets
-            }
-        }
+        val scroll = ScrollView(this).apply { addView(root) }
+        applyInsets(scroll)
         setContentView(scroll)
     }
 
@@ -321,11 +398,12 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        refresh()
+        if (mainUiBuilt) refresh()
     }
 
     private companion object {
         const val REQ_CONTACTS = 1
         const val REQ_ROLE = 2
+        const val MAX_TRIES = 5
     }
 }

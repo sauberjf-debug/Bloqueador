@@ -22,6 +22,23 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_BLOCK_HIDDEN, true)
         set(value) = sp.edit().putBoolean(KEY_BLOCK_HIDDEN, value).apply()
 
+    // ---------- Senha de administrador (versões de teste) ----------
+
+    /** True depois que a senha de administrador foi digitada neste aparelho. */
+    var unlocked: Boolean
+        get() = sp.getBoolean(KEY_UNLOCKED, false)
+        set(value) = sp.edit().putBoolean(KEY_UNLOCKED, value).apply()
+
+    /** Tentativas erradas seguidas. */
+    var failCount: Int
+        get() = sp.getInt(KEY_FAILS, 0)
+        set(value) = sp.edit().putInt(KEY_FAILS, value).apply()
+
+    /** Momento (ms) até o qual novas tentativas ficam bloqueadas. */
+    var lockUntil: Long
+        get() = sp.getLong(KEY_LOCK_UNTIL, 0L)
+        set(value) = sp.edit().putLong(KEY_LOCK_UNTIL, value).apply()
+
     // ---------- Horário ----------
 
     /** Se ligado, só bloqueia dentro da janela [scheduleStart, scheduleEnd]. */
@@ -104,6 +121,9 @@ class Prefs(context: Context) {
     companion object {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_BLOCK_HIDDEN = "block_hidden"
+        private const val KEY_UNLOCKED = "unlocked"
+        private const val KEY_FAILS = "admin_fails"
+        private const val KEY_LOCK_UNTIL = "admin_lock_until"
         private const val KEY_SCHEDULE_ON = "schedule_on"
         private const val KEY_SCHEDULE_START = "schedule_start"
         private const val KEY_SCHEDULE_END = "schedule_end"

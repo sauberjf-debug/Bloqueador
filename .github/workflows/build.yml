@@ -12,6 +12,8 @@ env:
   # Só existem depois que você cadastrar os "Secrets" no GitHub (ver LOJA/PASSO_A_PASSO.md).
   KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
   KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+  # Senha de administrador das versões de teste (APK). Sem ela, o APK sai SEM trava.
+  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
 jobs:
   build:
@@ -28,15 +30,22 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
+      - name: Avisar se a senha de administrador não estiver cadastrada
+        if: env.ADMIN_PASSWORD == ''
+        run: echo "::warning::Segredo ADMIN_PASSWORD não cadastrado. O APK será gerado SEM senha de administrador."
+
       - name: Compilar APK de teste
         run: gradle assembleDebug
 
       # Com a chave cadastrada: gera APK e pacote .aab assinados com a MESMA chave sempre.
+      # O APK (compartilhado fora da loja) leva a senha de administrador;
+      # o .aab da Play Store sai SEM a senha (ADMIN_GATE=0), para os testadores da loja.
       - name: Gerar APK e pacote (.aab) assinados
         if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != ''
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.p12"
-          KEYSTORE_PATH="$RUNNER_TEMP/upload.p12" gradle assembleRelease bundleRelease
+          KEYSTORE_PATH="$RUNNER_TEMP/upload.p12" gradle assembleRelease
+          KEYSTORE_PATH="$RUNNER_TEMP/upload.p12" ADMIN_GATE=0 gradle bundleRelease
 
       - name: Guardar pacote da Play Store
         if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != ''

@@ -8,6 +8,10 @@ No repositório, vá em **Settings > Secrets and variables > Actions > New repos
 | `KEYSTORE_BASE64` | todo o conteúdo do arquivo `keystore_base64.txt` (uma linha só) |
 | `KEYSTORE_PASSWORD` | o conteúdo do arquivo `senha.txt` |
 
+Crie também o segredo `ADMIN_PASSWORD` com a **senha de administrador que você escolher** (use 12 caracteres ou mais, com letras e números). Ela libera o APK de teste. Sem esse segredo, o APK sai **sem** senha.
+
+> O APK de teste (link em Releases) só funciona depois de digitar essa senha em cada aparelho. O pacote `.aab` da Play Store sai **sem** senha, de propósito, para os testadores da loja.
+
 Depois vá em **Actions > Gerar APK > Run workflow**. Ao terminar, a execução terá o arquivo `bloqueador-play-store-aab` em **Artifacts**.
 
 > Guarde uma cópia de `upload-key.p12` e da senha em local seguro (nuvem pessoal, gerenciador de senhas). Nunca publique esses arquivos.

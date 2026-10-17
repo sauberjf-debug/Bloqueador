@@ -46,6 +46,9 @@ class ContactCallScreeningService : CallScreeningService() {
         val prefs = Prefs(this)
         if (!prefs.enabled) return false
 
+        // Versão de teste ainda não liberada com a senha de administrador: não bloqueia nada.
+        if (AdminGate.required && !prefs.unlocked) return false
+
         // Fora do horário configurado, tudo passa.
         if (!prefs.isBlockingNow()) return false
 
