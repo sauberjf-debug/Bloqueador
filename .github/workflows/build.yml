@@ -35,7 +35,16 @@ jobs:
         run: echo "::warning::Segredo ADMIN_PASSWORD não cadastrado. O APK será gerado SEM senha de administrador."
 
       - name: Compilar APK de teste
-        run: gradle assembleDebug
+        run: |
+          set -o pipefail
+          gradle assembleDebug --console=plain 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      # Se a compilação falhar, mostra o motivo no resumo da execução (aba Actions).
+      - name: Mostrar erro da compilação
+        if: failure()
+        run: |
+          MSG=$(grep -E "^e: |error:|What went wrong|Execution failed|Could not|Unresolved|FAILED" -A4 "$RUNNER_TEMP/build.log" | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Erro do Gradle::$MSG"
 
       # Com a chave cadastrada: gera APK e pacote .aab assinados com a MESMA chave sempre.
       # O APK (compartilhado fora da loja) leva a senha de administrador;
