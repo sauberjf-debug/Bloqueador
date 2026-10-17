@@ -1,3 +1,5 @@
+import java.security.SecureRandom
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -19,7 +21,7 @@ val adminIterations = 120_000 // deve bater com AdminGate.kt
 fun hexOf(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it) }
 
 val adminSaltHex: String = if (adminGateOn) {
-    hexOf(ByteArray(16).also { java.security.SecureRandom().nextBytes(it) })
+    hexOf(ByteArray(16).also { SecureRandom().nextBytes(it) })
 } else ""
 
 val adminHashHex: String = if (adminGateOn) {
